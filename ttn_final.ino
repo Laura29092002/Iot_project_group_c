@@ -34,7 +34,7 @@ const lmic_pinmap lmic_pins = {
     .spi_freq = 8000000,
 };
 
-static uint8_t payload[9]; // Payload étendu pour inclure les coordonnées GPS
+static uint8_t payload[10]; // Payload étendu pour inclure les coordonnées GPS
 static osjob_t sendjob;
 const unsigned TX_INTERVAL = 10000; // Intervalle d'envoi (30 secondes)
 
@@ -82,13 +82,18 @@ void do_send() {
     // Gestion du GPS
     float latitude = 0.0;
     float longitude = 0.0;
+    bool valid_gps;
     while (Serial1.available() > 0) {
         char c = Serial1.read();
         gps.encode(c);
 
         if (gps.location.isValid()) {
-            latitude = gps.location.lat();
-            longitude = gps.location.lng();
+          latitude = gps.location.lat();
+          longitude = gps.location.lng();
+          valid_gps=true;
+        }
+        else{
+          valid_gps=false;
         }
     }
 
@@ -114,7 +119,6 @@ void do_send() {
   // Latitude et longitude
   uint16_t payloadLat = uint16_t(((latitude + 90.0) / 180.0) * 65535);
   uint16_t payloadLng = uint16_t(((longitude + 180.0) / 360.0) * 65535);
-
   // Construction du payload
   payload[0] = lowByte(payloadTemp);
   payload[1] = highByte(payloadTemp);
@@ -125,6 +129,7 @@ void do_send() {
   payload[6] = highByte(payloadLat);
   payload[7] = lowByte(payloadLng);
   payload[8] = highByte(payloadLng);
+  payload[9] = uint16_t(valid_gps);
 
 
     Serial.print("Payload : ");
@@ -165,31 +170,4 @@ void loop() {
         LMIC_reset();
         do_send();
     }
-}
-
-
-function Decoder(bytes, port) {
-  var decoded = {};
-
-  // Décodage de la température (2 premiers octets)
-  var tempRaw = (bytes[1] << 8) | bytes[0];
-  decoded.temperature = (tempRaw / 65535.0) * 50.0;
-
-  // Décodage de l'humidité (2 octets suivants)
-  var humidRaw = (bytes[3] << 8) | bytes[2];
-  decoded.humidity = 20.0 + ((humidRaw / 65535.0) * 70.0);
-
-  // Décodage du BPM (octet suivant)
-  decoded.bpm = bytes[4];
-
-  // Décodage de la latitude (2 octets suivants)
-  var latRaw = (bytes[6] << 8) | bytes[5];
-  decoded.latitude = (latRaw / 65535.0) * 180.0 - 90.0;
-
-  // Décodage de la longitude (2 derniers octets)
-  var lngRaw = (bytes[8] << 8) | bytes[7];
-  decoded.longitude = (lngRaw / 65535.0) * 360.0 - 180.0;
-  decoded.gpsValid = bytes[9];
-
-  return decoded;
 }
